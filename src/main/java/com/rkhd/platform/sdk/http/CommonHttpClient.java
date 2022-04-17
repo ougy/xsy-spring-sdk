@@ -3,7 +3,6 @@ package com.rkhd.platform.sdk.http;
 import com.alibaba.fastjson.JSONObject;
 import com.rkhd.platform.sdk.exception.XsyHttpException;
 import com.rkhd.platform.sdk.http.handler.ResponseBodyHandler;
-import com.rkhd.platform.sdk.util.IOUtil;
 import com.rkhd.platform.sdk.util.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.Header;
@@ -28,7 +27,6 @@ import org.apache.http.util.EntityUtils;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;

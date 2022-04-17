@@ -1,4 +1,4 @@
-package com.rkhd.platform.sdk.util;
+package com.rkhd.platform.sdk.service;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -10,6 +10,8 @@ import com.rkhd.platform.sdk.http.CommonHttpClient;
 import com.rkhd.platform.sdk.http.HttpResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -19,88 +21,47 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
-public class APIUtil {
-    private static final String HTTP_TYPE_POST = "POST";
-    private static final String HTTP_TYPE_GET = "GET";
-    private static final String HTTP_TYPE_PATCH = "PATCH";
-    private static final String HTTP_TYPE_DELETE = "DELETE";
-    private static final String HTTP_TYPE_PUT = "PUT";
-    private static final String ERROR_CODE = "error_code";
+@Component
+public class SdkService {
+    @Autowired
+    private OauthConfig oauthConfig;
 
-    private static final String COMMON_QUERY_URI;
-    private static final String COMMON_GET_INFO_BY_ID_URI;
-    private static final String COMMON_OBJECT_CREATE_URI;
-    private static final String COMMON_OBJECT_UPDATE_URI;
-    private static final String COMMON_OBJECT_DELETE_URI;
-    private static final String COMMON_QUERY_OBJECT_URI;
-    private static final String COMMON_STANDARD_OBJECT_DESCRIBE_URI;
-    private static final String COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI;
+    private final String DOMAIN = oauthConfig.getDomain();
 
-    private static final String COMMON_QUERY_URI_V2;
-    private static final String COMMON_GET_INFO_BY_ID_URI_V2;
-    private static final String COMMON_OBJECT_CREATE_URI_V2;
-    private static final String COMMON_OBJECT_UPDATE_URI_V2;
-    private static final String COMMON_OBJECT_DESCRIBE_URI_V2;
+    private final String HTTP_TYPE_POST = "POST";
+    private final String HTTP_TYPE_GET = "GET";
+    private final String HTTP_TYPE_PATCH = "PATCH";
+    private final String HTTP_TYPE_DELETE = "DELETE";
+    private final String HTTP_TYPE_PUT = "PUT";
+    private final String ERROR_CODE = "error_code";
 
-    private static final String COMMON_OBJECT_CREATE_URI_DEV;
-    private static final String COMMON_OBJECT_UPDATE_URI_DEV;
-    private static final String COMMON_OBJECT_DESCRIBE_URI_DEV;
-    private static final String COMMON_GET_INFO_BY_ID_URI_DEV;
+    private final String COMMON_QUERY_URI = DOMAIN + "/data/v1/query";
+    private final String COMMON_GET_INFO_BY_ID_URI = DOMAIN + "/data/v1/objects/%s/info?id=%s";
+    private final String COMMON_OBJECT_CREATE_URI = DOMAIN + "/data/v1/objects/%s/create";
+    private final String COMMON_OBJECT_UPDATE_URI = DOMAIN + "/data/v1/objects/%s/update";
+    private final String COMMON_OBJECT_DELETE_URI = DOMAIN + "/data/v1/objects/%s/delete";
+    private final String COMMON_QUERY_OBJECT_URI = DOMAIN + "/data/v1/objects/%s/%s";
+    private final String COMMON_STANDARD_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/%s/describe";
+    private final String COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/customize/describe?belongId=%s";
 
-    private static final String CREATE_ASYNC_JOB_URI_V2;
-    private static final String CLOSE_ASYNC_JOB_URI_V2;
-    private static final String CREATE_ASYNC_BATCH_URI_V2;
+    private final String COMMON_QUERY_URI_V2 = DOMAIN + "/rest/data/v2/query?q=%s";
+    private final String COMMON_GET_INFO_BY_ID_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
+    private final String COMMON_OBJECT_CREATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s";
+    private final String COMMON_OBJECT_UPDATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
+    private final String COMMON_OBJECT_DESCRIBE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/description";
 
-    private static final String ORDER_ACTIONS_LOCK;
-    private static final String ORDERPRODUCT_ACTIONS_LOCK;
-    private static final String CUSTOM_ACTIONS_LOCK;
+    private final String COMMON_OBJECT_CREATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s";
+    private final String COMMON_OBJECT_UPDATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
+    private final String COMMON_OBJECT_DESCRIBE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/description";
+    private final String COMMON_GET_INFO_BY_ID_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
 
-    private static final String DOMAIN;
-    private static final String USER_NAME;
-    private static final String PASSWORD;
-    private static final String SECURITY_CODE;
-    private static final String CLIENT_ID;
-    private static final String CLIENT_SECRET;
-    private static final Integer READ_TIMED_OUT_RETRY;
+    private final String CREATE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/data/v2.0/xobjects/order/actions/locks/%s/lock";//解锁/锁定订单
+    private final String CLOSE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/data/v2.0/xobjects/orderProduct/actions/locks/%s/lock";//解锁/锁定订单明细
+    private final String CREATE_ASYNC_BATCH_URI_V2 = DOMAIN + "/rest/data/v2.0/xobjects/%s/actions/locks?recordId=%s";//解锁/锁定自定义对象
 
-    static {
-        OauthConfig oauthConfig = TokenCache.oauthConfig;
-        DOMAIN = oauthConfig.getDomain();
-        USER_NAME = oauthConfig.getUserName();
-        PASSWORD = oauthConfig.getPassword();
-        SECURITY_CODE = oauthConfig.getSecurityCode();
-        CLIENT_ID = oauthConfig.getClientId();
-        CLIENT_SECRET = oauthConfig.getClientSecret();
-        READ_TIMED_OUT_RETRY = oauthConfig.getReadTimedOutRetry();
-
-        COMMON_QUERY_URI = DOMAIN + "/data/v1/query";
-        COMMON_GET_INFO_BY_ID_URI = DOMAIN + "/data/v1/objects/%s/info?id=%s";
-        COMMON_OBJECT_CREATE_URI = DOMAIN + "/data/v1/objects/%s/create";
-        COMMON_OBJECT_UPDATE_URI = DOMAIN + "/data/v1/objects/%s/update";
-        COMMON_OBJECT_DELETE_URI = DOMAIN + "/data/v1/objects/%s/delete";
-        COMMON_QUERY_OBJECT_URI = DOMAIN + "/data/v1/objects/%s/%s";
-        COMMON_STANDARD_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/%s/describe";
-        COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/customize/describe?belongId=%s";
-
-        COMMON_QUERY_URI_V2 = DOMAIN + "/rest/data/v2/query?q=%s";
-        COMMON_GET_INFO_BY_ID_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
-        COMMON_OBJECT_CREATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s";
-        COMMON_OBJECT_UPDATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
-        COMMON_OBJECT_DESCRIBE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/description";
-
-        COMMON_OBJECT_CREATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s";
-        COMMON_OBJECT_UPDATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
-        COMMON_OBJECT_DESCRIBE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/description";
-        COMMON_GET_INFO_BY_ID_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
-
-        ORDER_ACTIONS_LOCK = DOMAIN + "/rest/data/v2.0/xobjects/order/actions/locks/%s/lock";//解锁/锁定订单
-        ORDERPRODUCT_ACTIONS_LOCK = DOMAIN + "/rest/data/v2.0/xobjects/orderProduct/actions/locks/%s/lock";//解锁/锁定订单明细
-        CUSTOM_ACTIONS_LOCK = DOMAIN + "/rest/data/v2.0/xobjects/%s/actions/locks?recordId=%s";//解锁/锁定自定义对象
-
-        CREATE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/bulk/v2/job";
-        CLOSE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/bulk/v2/job/%s";
-        CREATE_ASYNC_BATCH_URI_V2 = DOMAIN + "/rest/bulk/v2/batch";
-    }
+    private final String ORDER_ACTIONS_LOCK = DOMAIN + "/rest/bulk/v2/job";
+    private final String ORDERPRODUCT_ACTIONS_LOCK = DOMAIN + "/rest/bulk/v2/job/%s";
+    private final String CUSTOM_ACTIONS_LOCK = DOMAIN + "/rest/bulk/v2/batch";
 
     public enum ItemType {
 
@@ -130,19 +91,19 @@ public class APIUtil {
         CUSTOMIZE
     }
 
-    public static String constructorImpl(CommonHttpClient commonHttpClient) {
+    public String constructorImpl(CommonHttpClient commonHttpClient) {
         String accessToken = TokenCache.getKey("accessToken");
         if (accessToken == null) {
             commonHttpClient.setContentEncoding("UTF-8");
             commonHttpClient.setContentType("application/json");
-            String oauthUrl = DOMAIN + "/oauth2/token?grant_type=password" + "&client_id=" + CLIENT_ID
-                    + "&client_secret=" + CLIENT_SECRET + "&username=" + USER_NAME + "&password=" + PASSWORD
-                    + SECURITY_CODE;
+            String oauthUrl = DOMAIN + "/oauth2/token?grant_type=password" + "&client_id=" + oauthConfig.getClientId()
+                    + "&client_secret=" + oauthConfig.getClientSecret() + "&username=" + oauthConfig.getUserName() + "&password=" + oauthConfig.getPassword()
+                    + oauthConfig.getSecurityCode();
             CommonData commonData = new CommonData();
             commonData.setCall_type(HTTP_TYPE_GET);
             commonData.setCallString(oauthUrl);
 
-            HttpResult result = commonHttpClient.execute(READ_TIMED_OUT_RETRY, commonData);
+            HttpResult result = commonHttpClient.execute(oauthConfig.getReadTimedOutRetry(), commonData);
             if (result != null && StringUtils.isNotBlank(result.getResult())) {
                 JSONObject jsonObject = JSONObject.parseObject(result.getResult());
                 if (jsonObject.containsKey("access_token")) {
@@ -170,9 +131,9 @@ public class APIUtil {
      * @param resultString 查询返回字符串
      * @return 查询结果
      */
-    private static JSONObject parseV2ApiQueryResult(String url,
-                                                    String resultString,
-                                                    String dataKey)
+    private JSONObject parseV2ApiQueryResult(String url,
+                                             String resultString,
+                                             String dataKey)
             throws IOException {
         JSONObject queryObject = JSONObject.parseObject(resultString);
 
@@ -183,8 +144,8 @@ public class APIUtil {
             log.error(String.format("查询url: %s，查询错误", URLDecoder.decode(url, StandardCharsets.UTF_8.name())));
             return null;
         } else {
-            int code = APIUtil.getInt(APIUtil.getObjectAttribute(queryObject, "code"));
-            String msg = APIUtil.getObjectAttribute(queryObject, "msg");
+            int code = getInt(getObjectAttribute(queryObject, "code"));
+            String msg = getObjectAttribute(queryObject, "msg");
 
             if (code != 200) {
                 log.error(String.format("查询url: %s，查询错误: %s", URLDecoder.decode(url, StandardCharsets.UTF_8.name()), msg));
@@ -208,9 +169,9 @@ public class APIUtil {
      * @return JSON Object
      * @throws IOException IOException
      */
-    public static JSONObject queryObjects(CommonHttpClient commonHttpClient,
-                                          APIVersion version,
-                                          String sql)
+    public JSONObject queryObjects(CommonHttpClient commonHttpClient,
+                                   APIVersion version,
+                                   String sql)
             throws IOException {
 
         JSONObject jsonObject = null;
@@ -227,7 +188,7 @@ public class APIUtil {
             result = commonHttpClient.performRequest(commonData);
 
             if (result.contains(ERROR_CODE)) {
-                String msg = String.format("在类%s方法%s发生错误: %s，查询SQL: %s", APIUtil.class.getName(), "queryObjects", result, sql);
+                String msg = String.format("在类%s方法%s发生错误: %s，查询SQL: %s", SdkService.class.getName(), "queryObjects", result, sql);
                 log.error(msg);
             } else {
                 jsonObject = JSONObject.parseObject(result);
@@ -256,10 +217,10 @@ public class APIUtil {
      * @return Query Object
      * @throws IOException IOException
      */
-    public static JSONObject queryObjectsById(CommonHttpClient commonHttpClient,
-                                              APIVersion version,
-                                              String queryObject,
-                                              long id)
+    public JSONObject queryObjectsById(CommonHttpClient commonHttpClient,
+                                       APIVersion version,
+                                       String queryObject,
+                                       long id)
             throws IOException {
 
         CommonData commonData = new CommonData();
@@ -277,7 +238,7 @@ public class APIUtil {
             result = commonHttpClient.performRequest(commonData);
 
             if (result.contains(ERROR_CODE)) {
-                String msg = String.format("在类%s方法%s发生错误: %s，查询url: %s", APIUtil.class.getName(), "queryObjects", result, url);
+                String msg = String.format("在类%s方法%s发生错误: %s，查询url: %s", SdkService.class.getName(), "queryObjects", result, url);
                 log.error(msg);
             } else {
                 jsonObject = JSONObject.parseObject(result);
@@ -310,13 +271,13 @@ public class APIUtil {
      * @return records里面的单条记录
      * @throws IOException IOException
      */
-    public static JSONObject querySingleObject(CommonHttpClient commonHttpClient,
-                                               APIVersion version,
-                                               String sql)
+    public JSONObject querySingleObject(CommonHttpClient commonHttpClient,
+                                        APIVersion version,
+                                        String sql)
             throws IOException {
 
-        JSONObject queryObject = (version == APIVersion.V1) ? APIUtil.queryObjects(commonHttpClient, APIVersion.V1, sql) :
-                APIUtil.queryObjects(commonHttpClient, APIVersion.V2, sql);
+        JSONObject queryObject = (version == APIVersion.V1) ? queryObjects(commonHttpClient, APIVersion.V1, sql) :
+                queryObjects(commonHttpClient, APIVersion.V2, sql);
 
         JSONObject returnObject = null;
 
@@ -348,10 +309,10 @@ public class APIUtil {
      * @throws IOException IOException
      */
     @Deprecated
-    public static JSONObject querySingleObject(CommonHttpClient commonHttpClient,
-                                               String queryObject,
-                                               String path,
-                                               Map<String, Object> params)
+    public JSONObject querySingleObject(CommonHttpClient commonHttpClient,
+                                        String queryObject,
+                                        String path,
+                                        Map<String, Object> params)
             throws IOException {
         String uri = String.format(COMMON_QUERY_OBJECT_URI, queryObject, path);
 
@@ -367,11 +328,10 @@ public class APIUtil {
             commonData.putFormData(key, params.get(key));
         }
 
-
         String result = commonHttpClient.performRequest(commonData);
 
         if (result.contains(ERROR_CODE)) {
-            String msg = String.format("在类%s方法%s发生错误: %s，查询url: %s", APIUtil.class.getName(), "querySingleObject", result, uri);
+            String msg = String.format("在类%s方法%s发生错误: %s，查询url: %s", SdkService.class.getName(), "querySingleObject", result, uri);
             log.error(msg);
         } else {
             jsonObject = JSONObject.parseObject(result);
@@ -390,9 +350,9 @@ public class APIUtil {
      * @return 查询对象数组
      * @throws IOException IOException
      */
-    public static JSONArray queryList(CommonHttpClient commonHttpClient,
-                                      APIVersion version,
-                                      String sql)
+    public JSONArray queryList(CommonHttpClient commonHttpClient,
+                               APIVersion version,
+                               String sql)
             throws IOException {
 
         JSONObject jsonObject;
@@ -429,7 +389,7 @@ public class APIUtil {
                     soql = String.format("%s limit %s, %s", sql, i * PAGE_SIZE,
                             PAGE_SIZE);
 
-                    JSONObject obj = APIUtil.queryObjects(commonHttpClient, APIVersion.V1, soql);
+                    JSONObject obj = queryObjects(commonHttpClient, APIVersion.V1, soql);
                     JSONArray arr = obj.getJSONArray("records");
                     jsonArray.addAll(arr);
                 }
@@ -456,14 +416,14 @@ public class APIUtil {
 
                 JSONObject recordObject = returnObject.getJSONObject("result");
 
-                totalSize = APIUtil.getInt(APIUtil.getObjectAttribute(recordObject, "totalSize"));
+                totalSize = getInt(getObjectAttribute(recordObject, "totalSize"));
 
                 //分页查询，每页100条
                 for (int i = 0; i < Math.ceil((double) totalSize / PAGE_SIZE); i++) {
                     urlParam = String.format("%s limit %s, %s", sql, i * PAGE_SIZE,
                             PAGE_SIZE);
 
-                    JSONObject obj = APIUtil.queryObjects(commonHttpClient, APIVersion.V2, urlParam);
+                    JSONObject obj = queryObjects(commonHttpClient, APIVersion.V2, urlParam);
                     JSONArray arr = obj.getJSONArray("records");
                     jsonArray.addAll(arr);
                 }
@@ -485,10 +445,10 @@ public class APIUtil {
      * @return 返回消息
      * @throws IOException IOException
      */
-    public static String createStandardObject(CommonHttpClient commonHttpClient,
-                                              APIVersion version,
-                                              String objName,
-                                              String jsonString)
+    public String createStandardObject(CommonHttpClient commonHttpClient,
+                                       APIVersion version,
+                                       String objName,
+                                       String jsonString)
             throws IOException {
         return (version == APIVersion.V1) ?
                 createObjectV1(commonHttpClient, ObjectType.STANDARD, objName, jsonString) :
@@ -505,10 +465,10 @@ public class APIUtil {
      * @return 创建信息
      * @throws IOException IOException
      */
-    public static String createCustomizeObject(CommonHttpClient commonHttpClient,
-                                               APIVersion version,
-                                               String objName,
-                                               String jsonString)
+    public String createCustomizeObject(CommonHttpClient commonHttpClient,
+                                        APIVersion version,
+                                        String objName,
+                                        String jsonString)
             throws IOException {
         return (version == APIVersion.V1) ?
                 createObjectV1(commonHttpClient, ObjectType.CUSTOMIZE, objName, jsonString) :
@@ -525,10 +485,10 @@ public class APIUtil {
      * @return 创建信息
      * @throws IOException IOException
      */
-    private static String createObjectV1(CommonHttpClient commonHttpClient,
-                                         ObjectType objectType,
-                                         String objName,
-                                         String jsonString)
+    private String createObjectV1(CommonHttpClient commonHttpClient,
+                                  ObjectType objectType,
+                                  String objName,
+                                  String jsonString)
             throws IOException {
         CommonData commonData = new CommonData();
         commonData.setCall_type(HTTP_TYPE_POST);
@@ -562,10 +522,10 @@ public class APIUtil {
      * @return 创建结果
      * @throws IOException IOException
      */
-    private static String createObjectV2(CommonHttpClient commonHttpClient,
-                                         APIVersion version,
-                                         String objName,
-                                         String jsonString)
+    private String createObjectV2(CommonHttpClient commonHttpClient,
+                                  APIVersion version,
+                                  String objName,
+                                  String jsonString)
             throws IOException {
 
         CommonData commonData = new CommonData();
@@ -584,12 +544,12 @@ public class APIUtil {
         JSONObject msgObject = JSONObject.parseObject(msg);
 
         if (msgObject.containsKey("code") && msgObject.containsKey("msg")) {
-            if (APIUtil.getInt(APIUtil.getObjectAttribute(msgObject, "code")) == 200) {
+            if (getInt(getObjectAttribute(msgObject, "code")) == 200) {
                 log.debug(String.format("创建对象结果: %s，创建url: %s, 创建内容: %s",
-                        APIUtil.getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
+                        getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
             } else {
                 log.error(String.format("创建对象错误: %s，创建url: %s, 创建内容: %s",
-                        APIUtil.getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
+                        getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
             }
 
         } else {
@@ -610,11 +570,11 @@ public class APIUtil {
      * @return 更新结果
      * @throws IOException IOException
      */
-    public static String updateStandardObject(CommonHttpClient commonHttpClient,
-                                              APIVersion version,
-                                              String objName,
-                                              long id,
-                                              String jsonString)
+    public String updateStandardObject(CommonHttpClient commonHttpClient,
+                                       APIVersion version,
+                                       String objName,
+                                       long id,
+                                       String jsonString)
             throws IOException {
 
         return (version == APIVersion.V1) ?
@@ -634,11 +594,11 @@ public class APIUtil {
      * @return 返回消息
      * @throws IOException IOException
      */
-    public static String updateCustomizeObject(CommonHttpClient commonHttpClient,
-                                               APIVersion version,
-                                               String jsonString,
-                                               String objName,
-                                               long id)
+    public String updateCustomizeObject(CommonHttpClient commonHttpClient,
+                                        APIVersion version,
+                                        String jsonString,
+                                        String objName,
+                                        long id)
             throws IOException {
 
         return (version == APIVersion.V1) ?
@@ -657,10 +617,10 @@ public class APIUtil {
      * @return 更新结果
      * @throws IOException IOException
      */
-    private static String updateObjectV1(CommonHttpClient commonHttpClient,
-                                         ObjectType objectType,
-                                         String objName,
-                                         String jsonString)
+    private String updateObjectV1(CommonHttpClient commonHttpClient,
+                                  ObjectType objectType,
+                                  String objName,
+                                  String jsonString)
             throws IOException {
 
         CommonData commonData = new CommonData();
@@ -699,11 +659,11 @@ public class APIUtil {
      * @return 更新结果
      * @throws IOException IOException
      */
-    private static String updateObjectV2(CommonHttpClient commonHttpClient,
-                                         APIVersion version,
-                                         String objName,
-                                         long id,
-                                         String jsonString)
+    private String updateObjectV2(CommonHttpClient commonHttpClient,
+                                  APIVersion version,
+                                  String objName,
+                                  long id,
+                                  String jsonString)
             throws IOException {
 
         CommonData commonData = new CommonData();
@@ -722,12 +682,12 @@ public class APIUtil {
         JSONObject msgObject = JSONObject.parseObject(msg);
 
         if (msgObject.containsKey("code") && msgObject.containsKey("msg")) {
-            if (APIUtil.getInt(APIUtil.getObjectAttribute(msgObject, "code")) == 200) {
+            if (getInt(getObjectAttribute(msgObject, "code")) == 200) {
                 log.debug(String.format("更新对象结果: %s，更新url: %s, 更新内容: %s",
-                        APIUtil.getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
+                        getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
             } else {
                 log.error(String.format("更新对象错误: %s，更新url: %s, 更新内容: %s",
-                        APIUtil.getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
+                        getObjectAttribute(msgObject, "msg"), url, dataObject.toString()));
             }
 
         } else {
@@ -746,10 +706,10 @@ public class APIUtil {
      * @return 返回消息
      * @throws IOException IOException
      */
-    public static String deleteStandardObject(CommonHttpClient commonHttpClient,
-                                              APIVersion version,
-                                              String objName,
-                                              long id)
+    public String deleteStandardObject(CommonHttpClient commonHttpClient,
+                                       APIVersion version,
+                                       String objName,
+                                       long id)
             throws IOException {
 
         return (version == APIVersion.V1) ?
@@ -767,10 +727,10 @@ public class APIUtil {
      * @return 返回消息
      * @throws IOException IOException
      */
-    public static String deleteCustomizeObject(CommonHttpClient commonHttpClient,
-                                               APIVersion version,
-                                               String objName,
-                                               long id)
+    public String deleteCustomizeObject(CommonHttpClient commonHttpClient,
+                                        APIVersion version,
+                                        String objName,
+                                        long id)
             throws IOException {
 
         return (version == APIVersion.V1) ?
@@ -788,10 +748,10 @@ public class APIUtil {
      * @return 删除结果
      * @throws IOException IOException
      */
-    private static String deleteObjectV1(CommonHttpClient commonHttpClient,
-                                         ObjectType objectType,
-                                         String objName,
-                                         long id)
+    private String deleteObjectV1(CommonHttpClient commonHttpClient,
+                                  ObjectType objectType,
+                                  String objName,
+                                  long id)
             throws IOException {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -827,10 +787,10 @@ public class APIUtil {
      * @return 删除结果
      * @throws IOException IOException
      */
-    private static String deleteObjectV2(CommonHttpClient commonHttpClient,
-                                         APIVersion version,
-                                         String objName,
-                                         long id)
+    private String deleteObjectV2(CommonHttpClient commonHttpClient,
+                                  APIVersion version,
+                                  String objName,
+                                  long id)
             throws IOException {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -845,12 +805,12 @@ public class APIUtil {
         JSONObject msgObject = JSONObject.parseObject(msg);
 
         if (msgObject.containsKey("code") && msgObject.containsKey("msg")) {
-            if (APIUtil.getInt(APIUtil.getObjectAttribute(msgObject, "code")) == 200) {
+            if (getInt(getObjectAttribute(msgObject, "code")) == 200) {
                 log.debug(String.format("删除对象结果: %s，删除url: %s",
-                        APIUtil.getObjectAttribute(msgObject, "msg"), url));
+                        getObjectAttribute(msgObject, "msg"), url));
             } else {
                 log.error(String.format("删除对象错误: %s，删除url: %s",
-                        APIUtil.getObjectAttribute(msgObject, "msg"), url));
+                        getObjectAttribute(msgObject, "msg"), url));
             }
         } else {
             log.error(String.format("删除对象结果错误，删除url: %s", url));
@@ -868,10 +828,10 @@ public class APIUtil {
      * @return 所有选择型字段对应的描述
      * @throws IOException IOException
      */
-    private static Map<String, Map<Integer, String>> separateItemsLabelsFromObjectDescription(CommonHttpClient commonHttpClient,
-                                                                                              APIVersion version,
-                                                                                              String url,
-                                                                                              ItemType itemType)
+    private Map<String, Map<Integer, String>> separateItemsLabelsFromObjectDescription(CommonHttpClient commonHttpClient,
+                                                                                       APIVersion version,
+                                                                                       String url,
+                                                                                       ItemType itemType)
             throws IOException {
 
         CommonData commonData = new CommonData();
@@ -905,7 +865,6 @@ public class APIUtil {
 
         //描述Map，key:字段名，value: item的值-item项标签
         Map<String, Map<Integer, String>> itemsLabelMap = new HashMap<>();
-
 
         JSONObject describeObject;
         if (msg != null && !msg.isEmpty() && msg.contains(rootNodeField)) {
@@ -964,9 +923,9 @@ public class APIUtil {
      * @param value         字段值
      * @return 字段描述
      */
-    public static String getSingleSelectItemLabel(Map<String, Map<Integer, String>> itemsLabelMap,
-                                                  String propertyName,
-                                                  int value) {
+    public String getSingleSelectItemLabel(Map<String, Map<Integer, String>> itemsLabelMap,
+                                           String propertyName,
+                                           int value) {
 
         if (itemsLabelMap.containsKey(propertyName)) {
             Map<Integer, String> labelMap = itemsLabelMap.get(propertyName);
@@ -983,7 +942,6 @@ public class APIUtil {
                 propertyName, value));
 
         return "";
-
     }
 
     /**
@@ -994,9 +952,9 @@ public class APIUtil {
      * @param label         字段描述
      * @return 字段值
      */
-    public static int getSingleSelectItemValue(Map<String, Map<Integer, String>> itemsLabelMap,
-                                               String propertyName,
-                                               String label) {
+    public int getSingleSelectItemValue(Map<String, Map<Integer, String>> itemsLabelMap,
+                                        String propertyName,
+                                        String label) {
 
         if (itemsLabelMap.containsKey(propertyName)) {
             Map<Integer, String> labelMap = itemsLabelMap.get(propertyName);
@@ -1022,9 +980,9 @@ public class APIUtil {
      * @param vagueLabel    模糊字段描述  xxx%
      * @return 字段值
      */
-    public static int getSingleSelectItemValueByVagueLabel(Map<String, Map<Integer, String>> itemsLabelMap,
-                                                           String propertyName,
-                                                           String vagueLabel) {
+    public int getSingleSelectItemValueByVagueLabel(Map<String, Map<Integer, String>> itemsLabelMap,
+                                                    String propertyName,
+                                                    String vagueLabel) {
 
         if (itemsLabelMap.containsKey(propertyName)) {
             Map<Integer, String> labelMap = itemsLabelMap.get(propertyName);
@@ -1057,12 +1015,12 @@ public class APIUtil {
      * @return 字段对应描述
      * @throws IOException IOException
      */
-    public static String getSingleSelectItemLabel(CommonHttpClient commonHttpClient,
-                                                  String objectName,
-                                                  String propertyName,
-                                                  APIVersion version,
-                                                  ItemType itemType,
-                                                  int value)
+    public String getSingleSelectItemLabel(CommonHttpClient commonHttpClient,
+                                           String objectName,
+                                           String propertyName,
+                                           APIVersion version,
+                                           ItemType itemType,
+                                           int value)
             throws IOException {
 
         Map<String, Map<Integer, String>> itemsLabelMap = getSelectItemLabels(commonHttpClient,
@@ -1083,7 +1041,6 @@ public class APIUtil {
                 objectName, propertyName, value));
 
         return "";
-
     }
 
     /**
@@ -1096,10 +1053,10 @@ public class APIUtil {
      * @return 所有选择型字段对应的描述
      * @throws IOException IOException
      */
-    public static Map<String, Map<Integer, String>> getSelectItemLabels(CommonHttpClient commonHttpClient,
-                                                                        APIVersion version,
-                                                                        String objectName,
-                                                                        ItemType itemType)
+    public Map<String, Map<Integer, String>> getSelectItemLabels(CommonHttpClient commonHttpClient,
+                                                                 APIVersion version,
+                                                                 String objectName,
+                                                                 ItemType itemType)
             throws IOException {
 
         String url = "";
@@ -1121,7 +1078,6 @@ public class APIUtil {
         log.debug(String.format("查找标准对象选择型字段描述值，查找url: %s", url));
 
         return separateItemsLabelsFromObjectDescription(commonHttpClient, version, url, itemType);
-
     }
 
     /**
@@ -1133,16 +1089,15 @@ public class APIUtil {
      * @return 所有选择型字段对应的描述
      * @throws IOException IOException
      */
-    public static Map<String, Map<Integer, String>> getSelectItemLabels(CommonHttpClient commonHttpClient,
-                                                                        long belongId,
-                                                                        ItemType itemType)
+    public Map<String, Map<Integer, String>> getSelectItemLabels(CommonHttpClient commonHttpClient,
+                                                                 long belongId,
+                                                                 ItemType itemType)
             throws IOException {
 
         String url = String.format(COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI, belongId);
         log.debug(String.format("查找自定义对象选择型字段描述值，查找url: %s", url));
 
         return separateItemsLabelsFromObjectDescription(commonHttpClient, APIVersion.V1, url, itemType);
-
     }
 
     /**
@@ -1150,7 +1105,7 @@ public class APIUtil {
      *
      * @param orderId
      */
-    public static void lockOrder(long orderId) {
+    public void lockOrder(long orderId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -1167,7 +1122,7 @@ public class APIUtil {
      *
      * @param orderId
      */
-    public static void unlockOrder(long orderId) {
+    public void unlockOrder(long orderId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -1185,7 +1140,7 @@ public class APIUtil {
      * @param objectName
      * @param recordId
      */
-    public static void lockCustom(String objectName, long recordId) {
+    public void lockCustom(String objectName, long recordId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -1203,7 +1158,7 @@ public class APIUtil {
      * @param objectName
      * @param recordId
      */
-    public static void unlockCustom(String objectName, long recordId) {
+    public void unlockCustom(String objectName, long recordId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -1220,7 +1175,7 @@ public class APIUtil {
      *
      * @param orderProductId
      */
-    public static void lockOrderProduct(long orderProductId) {
+    public void lockOrderProduct(long orderProductId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -1237,7 +1192,7 @@ public class APIUtil {
      *
      * @param orderProductId
      */
-    public static void unlockOrderProduct(long orderProductId) {
+    public void unlockOrderProduct(long orderProductId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
@@ -1253,7 +1208,7 @@ public class APIUtil {
      * @param object    操作的对象，可通过对象查询接口获取objectname
      * @param operation 执行的操作，目前支持：insert,update,delete,query
      */
-    public static JSONObject createAsyncJob(String object, String operation) {
+    public JSONObject createAsyncJob(String object, String operation) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
 
@@ -1285,7 +1240,7 @@ public class APIUtil {
     }
 
     //关闭异步作业Job
-    public static JSONObject closeAsyncJob(String jobId) {
+    public JSONObject closeAsyncJob(String jobId) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
 
@@ -1311,7 +1266,7 @@ public class APIUtil {
     }
 
     //创建异步批量任务
-    public static JSONObject createAsyncBatch(String jobId, JSONArray datas) {
+    public JSONObject createAsyncBatch(String jobId, JSONArray datas) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
 
@@ -1337,7 +1292,7 @@ public class APIUtil {
     }
 
     //创建异步批量任务
-    public static JSONObject createAsyncBatch(String jobId, JSONArray datas, SerializerFeature... features) {
+    public JSONObject createAsyncBatch(String jobId, JSONArray datas, SerializerFeature... features) {
         CommonHttpClient commonHttpClient = CommonHttpClient.instance();
         CommonData commonData = new CommonData();
 
@@ -1369,7 +1324,7 @@ public class APIUtil {
      * @param attrName 属性名称
      * @return 属性值
      */
-    public static String getObjectAttribute(JSONObject obj, String attrName) {
+    public String getObjectAttribute(JSONObject obj, String attrName) {
         String value = "";
 
         if (obj != null && obj.containsKey(attrName)) {
@@ -1389,29 +1344,12 @@ public class APIUtil {
     }
 
     /**
-     * 获取长整型数值
-     *
-     * @param value 字符型参数
-     * @return 转换的长整型数值
-     */
-    public static long getLong(String value) throws NumberFormatException {
-        long result = 0L;
-
-        if (!value.isEmpty()) {
-            result = Long.valueOf(value);
-
-        }
-
-        return result;
-    }
-
-    /**
      * 获取整型数值
      *
      * @param value 字符型参数
      * @return 转换的整型数值
      */
-    public static int getInt(String value) throws NumberFormatException {
+    public int getInt(String value) throws NumberFormatException {
         int result = 0;
 
         if (!value.isEmpty()) {
@@ -1421,35 +1359,4 @@ public class APIUtil {
         return result;
     }
 
-    /**
-     * 获取双精度浮点数数值
-     *
-     * @param value 字符型参数
-     * @return 转换的双精度浮点数数值
-     */
-    public static double getDouble(String value) throws NumberFormatException {
-        double result = 0d;
-
-        if (!value.isEmpty()) {
-            result = Double.valueOf(value);
-        }
-
-        return result;
-    }
-
-    /**
-     * 获取单精度浮点数值
-     *
-     * @param value 字符型参数
-     * @return 转换的单精度浮点数数值
-     */
-    public static float getFloat(String value) throws NumberFormatException {
-        float result = 0f;
-
-        if (!value.isEmpty()) {
-            result = Float.valueOf(value);
-        }
-
-        return result;
-    }
 }
