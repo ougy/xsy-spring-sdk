@@ -5,7 +5,7 @@
 
     <groupId>com.ouguiyuan</groupId>
     <artifactId>xsy-spring-sdk</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0-RELEASE</version>
     <packaging>jar</packaging>
     <name>xsy-spring-sdk</name>
     <description>This is the SDK used by the neocrm middleware</description>
