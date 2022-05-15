@@ -3,15 +3,13 @@ package com.rkhd.platform.sdk.service;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
-import com.rkhd.platform.sdk.common.OauthConfig;
-import com.rkhd.platform.sdk.common.TokenCache;
 import com.rkhd.platform.sdk.http.CommonData;
 import com.rkhd.platform.sdk.http.CommonHttpClient;
 import com.rkhd.platform.sdk.http.HttpResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -20,48 +18,106 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * SdkService封装一些OpenAPI通用方法
+ *
+ * @author 欧桂源
+ * @date 2022/5/01 12:50
+ */
 @Slf4j
-@Component
+@Service
 public class SdkService {
-    @Autowired
-    private OauthConfig oauthConfig;
-
-    private final String DOMAIN = oauthConfig.getDomain();
-
-    private final String HTTP_TYPE_POST = "POST";
-    private final String HTTP_TYPE_GET = "GET";
-    private final String HTTP_TYPE_PATCH = "PATCH";
-    private final String HTTP_TYPE_DELETE = "DELETE";
-    private final String HTTP_TYPE_PUT = "PUT";
+    public final String HTTP_TYPE_POST = "POST";
+    public final String HTTP_TYPE_GET = "GET";
+    public final String HTTP_TYPE_PATCH = "PATCH";
+    public final String HTTP_TYPE_DELETE = "DELETE";
+    public final String HTTP_TYPE_PUT = "PUT";
+    public final String AUTHORIZATION = "Authorization";
+    public final String HEADER_PREFIX = "Bearer ";
     private final String ERROR_CODE = "error_code";
 
-    private final String COMMON_QUERY_URI = DOMAIN + "/data/v1/query";
-    private final String COMMON_GET_INFO_BY_ID_URI = DOMAIN + "/data/v1/objects/%s/info?id=%s";
-    private final String COMMON_OBJECT_CREATE_URI = DOMAIN + "/data/v1/objects/%s/create";
-    private final String COMMON_OBJECT_UPDATE_URI = DOMAIN + "/data/v1/objects/%s/update";
-    private final String COMMON_OBJECT_DELETE_URI = DOMAIN + "/data/v1/objects/%s/delete";
-    private final String COMMON_QUERY_OBJECT_URI = DOMAIN + "/data/v1/objects/%s/%s";
-    private final String COMMON_STANDARD_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/%s/describe";
-    private final String COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/customize/describe?belongId=%s";
+    private final String COMMON_QUERY_URI;
+    private final String COMMON_GET_INFO_BY_ID_URI;
+    private final String COMMON_OBJECT_CREATE_URI;
+    private final String COMMON_OBJECT_UPDATE_URI;
+    private final String COMMON_OBJECT_DELETE_URI;
+    private final String COMMON_STANDARD_OBJECT_DESCRIBE_URI;
+    private final String COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI;
 
-    private final String COMMON_QUERY_URI_V2 = DOMAIN + "/rest/data/v2/query?q=%s";
-    private final String COMMON_GET_INFO_BY_ID_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
-    private final String COMMON_OBJECT_CREATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s";
-    private final String COMMON_OBJECT_UPDATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
-    private final String COMMON_OBJECT_DESCRIBE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/description";
+    private final String COMMON_QUERY_URI_V2;
+    private final String COMMON_GET_INFO_BY_ID_URI_V2;
+    private final String COMMON_OBJECT_CREATE_URI_V2;
+    private final String COMMON_OBJECT_UPDATE_URI_V2;
+    private final String COMMON_OBJECT_DESCRIBE_URI_V2;
 
-    private final String COMMON_OBJECT_CREATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s";
-    private final String COMMON_OBJECT_UPDATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
-    private final String COMMON_OBJECT_DESCRIBE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/description";
-    private final String COMMON_GET_INFO_BY_ID_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
+    private final String COMMON_OBJECT_CREATE_URI_DEV;
+    private final String COMMON_OBJECT_UPDATE_URI_DEV;
+    private final String COMMON_OBJECT_DESCRIBE_URI_DEV;
+    private final String COMMON_GET_INFO_BY_ID_URI_DEV;
 
-    private final String CREATE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/data/v2.0/xobjects/order/actions/locks/%s/lock";//解锁/锁定订单
-    private final String CLOSE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/data/v2.0/xobjects/orderProduct/actions/locks/%s/lock";//解锁/锁定订单明细
-    private final String CREATE_ASYNC_BATCH_URI_V2 = DOMAIN + "/rest/data/v2.0/xobjects/%s/actions/locks?recordId=%s";//解锁/锁定自定义对象
+    private final String CREATE_ASYNC_JOB_URI_V2;
+    private final String CLOSE_ASYNC_JOB_URI_V2;
+    private final String CREATE_ASYNC_BATCH_URI_V2;
 
-    private final String ORDER_ACTIONS_LOCK = DOMAIN + "/rest/bulk/v2/job";
-    private final String ORDERPRODUCT_ACTIONS_LOCK = DOMAIN + "/rest/bulk/v2/job/%s";
-    private final String CUSTOM_ACTIONS_LOCK = DOMAIN + "/rest/bulk/v2/batch";
+    private final String COMMON_STANDARD_ACTIONS_LOCK;
+    private final String COMMON_CUSTOMIZE_ACTIONS_LOCK;
+    private final String COMMON_CUSTOMIZE_ACTIONS_TRANSFERS;
+
+    private final String COMMON_BUSITYPE;
+    private final String COMMON_GLOBALPICKS_ALL;
+    private final String COMMON_GLOBALPICKS_ASSIGN;
+
+    private final String DOMAIN;
+    private final String USER_NAME;
+    private final String PASSWORD;
+    private final String SECURITY_CODE;
+    private final String CLIENT_ID;
+    private final String CLIENT_SECRET;
+    private final Integer READ_TIMED_OUT_RETRY;
+    private final OauthConfig oauthConfig;
+
+    @Autowired
+    public SdkService(OauthConfig oauthConfig) {
+        this.oauthConfig = oauthConfig;
+        DOMAIN = oauthConfig.getDomain();
+        USER_NAME = oauthConfig.getUserName();
+        PASSWORD = oauthConfig.getPassword();
+        SECURITY_CODE = oauthConfig.getSecurityCode();
+        CLIENT_ID = oauthConfig.getClientId();
+        CLIENT_SECRET = oauthConfig.getClientSecret();
+        READ_TIMED_OUT_RETRY = oauthConfig.getReadTimedOutRetry();
+
+        COMMON_QUERY_URI = DOMAIN + "/data/v1/query";
+        COMMON_GET_INFO_BY_ID_URI = DOMAIN + "/data/v1/objects/%s/info?id=%s";
+        COMMON_OBJECT_CREATE_URI = DOMAIN + "/data/v1/objects/%s/create";
+        COMMON_OBJECT_UPDATE_URI = DOMAIN + "/data/v1/objects/%s/update";
+        COMMON_OBJECT_DELETE_URI = DOMAIN + "/data/v1/objects/%s/delete";
+        COMMON_STANDARD_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/%s/describe";
+        COMMON_CUSTOMIZE_OBJECT_DESCRIBE_URI = DOMAIN + "/data/v1/objects/customize/describe?belongId=%s";
+
+        COMMON_QUERY_URI_V2 = DOMAIN + "/rest/data/v2/query?q=%s";
+        COMMON_GET_INFO_BY_ID_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
+        COMMON_OBJECT_CREATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s";
+        COMMON_OBJECT_UPDATE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/%s";
+        COMMON_OBJECT_DESCRIBE_URI_V2 = DOMAIN + "/rest/data/v2/objects/%s/description";
+
+        COMMON_OBJECT_CREATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s";
+        COMMON_OBJECT_UPDATE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
+        COMMON_OBJECT_DESCRIBE_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/description";
+        COMMON_GET_INFO_BY_ID_URI_DEV = DOMAIN + "/rest/data/v2.0/xobjects/%s/%s";
+
+        COMMON_STANDARD_ACTIONS_LOCK = DOMAIN + "/rest/data/v2.0/xobjects/%s/actions/locks/%s/lock";//解锁/锁定标准对象
+        COMMON_CUSTOMIZE_ACTIONS_LOCK = DOMAIN + "/rest/data/v2.0/xobjects/%s/actions/locks?recordId=%s";//解锁/锁定自定义对象
+        COMMON_CUSTOMIZE_ACTIONS_TRANSFERS = DOMAIN + "/rest/data/v2.0/xobjects/%s/actions/transfers?recordId=%s&targetUserId=%s";//转移自定义对象
+
+        COMMON_BUSITYPE = DOMAIN + "/rest/data/v2.0/xobjects/%s/busiType";//获取业务类型
+        COMMON_GLOBALPICKS_ALL = DOMAIN + "/rest/metadata/v2.0/settings/globalPicks";//获取所有通用选项集
+        COMMON_GLOBALPICKS_ASSIGN = DOMAIN + "/rest/metadata/v2.0/settings/globalPicks/%s";//获取指定通用选项集
+
+        CREATE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/bulk/v2/job";
+        CLOSE_ASYNC_JOB_URI_V2 = DOMAIN + "/rest/bulk/v2/job/%s";
+        CREATE_ASYNC_BATCH_URI_V2 = DOMAIN + "/rest/bulk/v2/batch";
+    }
 
     public enum ItemType {
 
@@ -96,14 +152,14 @@ public class SdkService {
         if (accessToken == null) {
             commonHttpClient.setContentEncoding("UTF-8");
             commonHttpClient.setContentType("application/json");
-            String oauthUrl = DOMAIN + "/oauth2/token?grant_type=password" + "&client_id=" + oauthConfig.getClientId()
-                    + "&client_secret=" + oauthConfig.getClientSecret() + "&username=" + oauthConfig.getUserName() + "&password=" + oauthConfig.getPassword()
-                    + oauthConfig.getSecurityCode();
+            String oauthUrl = DOMAIN + "/oauth2/token?grant_type=password" + "&client_id=" + CLIENT_ID
+                    + "&client_secret=" + CLIENT_SECRET + "&username=" + USER_NAME + "&password=" + PASSWORD
+                    + SECURITY_CODE;
             CommonData commonData = new CommonData();
             commonData.setCall_type(HTTP_TYPE_GET);
             commonData.setCallString(oauthUrl);
 
-            HttpResult result = commonHttpClient.execute(oauthConfig.getReadTimedOutRetry(), commonData);
+            HttpResult result = commonHttpClient.execute(READ_TIMED_OUT_RETRY, commonData);
             if (result != null && StringUtils.isNotBlank(result.getResult())) {
                 JSONObject jsonObject = JSONObject.parseObject(result.getResult());
                 if (jsonObject.containsKey("access_token")) {
@@ -179,7 +235,7 @@ public class SdkService {
 
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         if (version == APIVersion.V1) {
             commonData.setCall_type(HTTP_TYPE_POST);
             commonData.setCallString(COMMON_QUERY_URI);
@@ -202,8 +258,7 @@ public class SdkService {
             commonData.setCallString(url);
             result = commonHttpClient.performRequest(commonData);
 
-            return version == APIVersion.V2 ? parseV2ApiQueryResult(url, result, "result") :
-                    parseV2ApiQueryResult(url, result, "data");
+            return parseV2ApiQueryResult(url, result, "result");
         }
     }
 
@@ -225,7 +280,7 @@ public class SdkService {
 
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         String result;
 
         if (version == APIVersion.V1) {
@@ -299,49 +354,6 @@ public class SdkService {
     }
 
     /**
-     * 查询单个对象
-     *
-     * @param commonHttpClient HTTP Client
-     * @param queryObject      查询的对象名称
-     * @param path             对象路径
-     * @param params           参数
-     * @return 查询对象
-     * @throws IOException IOException
-     */
-    @Deprecated
-    public JSONObject querySingleObject(CommonHttpClient commonHttpClient,
-                                        String queryObject,
-                                        String path,
-                                        Map<String, Object> params)
-            throws IOException {
-        String uri = String.format(COMMON_QUERY_OBJECT_URI, queryObject, path);
-
-        JSONObject jsonObject = null;
-
-        CommonData commonData = new CommonData();
-        String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
-        commonData.setCall_type(HTTP_TYPE_POST);
-        commonData.setCallString(uri);
-
-        for (String key : params.keySet()) {
-            commonData.putFormData(key, params.get(key));
-        }
-
-        String result = commonHttpClient.performRequest(commonData);
-
-        if (result.contains(ERROR_CODE)) {
-            String msg = String.format("在类%s方法%s发生错误: %s，查询url: %s", SdkService.class.getName(), "querySingleObject", result, uri);
-            log.error(msg);
-        } else {
-            jsonObject = JSONObject.parseObject(result);
-            log.debug(String.format("查询单个对象查询: %s，查询结果: %s", uri, result));
-        }
-
-        return jsonObject;
-    }
-
-    /**
      * 分页查询记录
      *
      * @param commonHttpClient HTTP Client
@@ -364,7 +376,7 @@ public class SdkService {
 
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         if (version == APIVersion.V1) {
 
             commonData.setCall_type(HTTP_TYPE_POST);
@@ -493,7 +505,7 @@ public class SdkService {
         CommonData commonData = new CommonData();
         commonData.setCall_type(HTTP_TYPE_POST);
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         String url = (objectType == ObjectType.CUSTOMIZE) ?
                 String.format(COMMON_OBJECT_CREATE_URI, "customize") :
                 String.format(COMMON_OBJECT_CREATE_URI, objName);
@@ -530,7 +542,7 @@ public class SdkService {
 
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         JSONObject dataObject = new JSONObject();
         dataObject.put("data", JSONObject.parseObject(jsonString));
 
@@ -626,7 +638,7 @@ public class SdkService {
         CommonData commonData = new CommonData();
         commonData.setCall_type(HTTP_TYPE_POST);
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         String url = (objectType == ObjectType.CUSTOMIZE) ?
                 String.format(COMMON_OBJECT_UPDATE_URI, "customize") :
                 String.format(COMMON_OBJECT_UPDATE_URI, objName);
@@ -668,7 +680,7 @@ public class SdkService {
 
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         String url = (version == APIVersion.V2) ? String.format(COMMON_OBJECT_UPDATE_URI_V2, objName, id) :
                 String.format(COMMON_OBJECT_UPDATE_URI_DEV, objName, id);
 
@@ -755,7 +767,7 @@ public class SdkService {
             throws IOException {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         String url = (objectType == ObjectType.STANDARD) ?
                 String.format(COMMON_OBJECT_DELETE_URI, objName) :
                 String.format(COMMON_OBJECT_DELETE_URI, "customize");
@@ -794,7 +806,7 @@ public class SdkService {
             throws IOException {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         String url = (version == APIVersion.V2) ? String.format(COMMON_OBJECT_UPDATE_URI_V2, objName, id) :
                 String.format(COMMON_OBJECT_UPDATE_URI_DEV, objName, id);
 
@@ -836,7 +848,7 @@ public class SdkService {
 
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_GET);
         commonData.setCallString(url);
 
@@ -865,6 +877,7 @@ public class SdkService {
 
         //描述Map，key:字段名，value: item的值-item项标签
         Map<String, Map<Integer, String>> itemsLabelMap = new HashMap<>();
+
 
         JSONObject describeObject;
         if (msg != null && !msg.isEmpty() && msg.contains(rootNodeField)) {
@@ -942,6 +955,7 @@ public class SdkService {
                 propertyName, value));
 
         return "";
+
     }
 
     /**
@@ -1041,6 +1055,7 @@ public class SdkService {
                 objectName, propertyName, value));
 
         return "";
+
     }
 
     /**
@@ -1078,6 +1093,7 @@ public class SdkService {
         log.debug(String.format("查找标准对象选择型字段描述值，查找url: %s", url));
 
         return separateItemsLabelsFromObjectDescription(commonHttpClient, version, url, itemType);
+
     }
 
     /**
@@ -1098,110 +1114,413 @@ public class SdkService {
         log.debug(String.format("查找自定义对象选择型字段描述值，查找url: %s", url));
 
         return separateItemsLabelsFromObjectDescription(commonHttpClient, APIVersion.V1, url, itemType);
+
     }
 
     /**
-     * 订单锁定
+     * 标准对象锁定
      *
-     * @param orderId
+     * @param commonHttpClient HTTP Client
+     * @param id               标准对象数据Id
      */
-    public void lockOrder(long orderId) {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+    public void lockStandardObject(CommonHttpClient commonHttpClient, String objectName, long id) {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_PUT);
-        commonData.setCallString(String.format(ORDER_ACTIONS_LOCK, orderId));
+        commonData.setCallString(String.format(COMMON_STANDARD_ACTIONS_LOCK, objectName, id));
 
         String msg = commonHttpClient.performRequest(commonData);
-        log.debug("订单锁定：" + msg);
+        log.debug(String.format("标准对象%s锁定,返回:%s", objectName, msg));
     }
 
     /**
-     * 订单解锁
+     * 标准对象解锁
      *
-     * @param orderId
+     * @param commonHttpClient HTTP Client
+     * @param id               标准对象数据Id
      */
-    public void unlockOrder(long orderId) {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+    public void unlockStandardObject(CommonHttpClient commonHttpClient, String objectName, long id) {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_DELETE);
-        commonData.setCallString(String.format(ORDER_ACTIONS_LOCK, orderId));
+        commonData.setCallString(String.format(COMMON_STANDARD_ACTIONS_LOCK, objectName, id));
 
         String msg = commonHttpClient.performRequest(commonData);
-        log.debug("订单解锁：" + msg);
+        log.debug(String.format("标准对象%s解锁,返回:%s", objectName, msg));
     }
 
     /**
      * 自定义对象锁定
      *
-     * @param objectName
-     * @param recordId
+     * @param commonHttpClient HTTP Client
+     * @param objectName       自定义对象API名称
+     * @param recordId         自定义对象数据Id
      */
-    public void lockCustom(String objectName, long recordId) {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+    public void lockCustomizeObject(CommonHttpClient commonHttpClient, String objectName, long recordId) {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_POST);
-        commonData.setCallString(String.format(CUSTOM_ACTIONS_LOCK, objectName, recordId));
+        commonData.setCallString(String.format(COMMON_CUSTOMIZE_ACTIONS_LOCK, objectName, recordId));
 
         String msg = commonHttpClient.performRequest(commonData);
-        log.debug("自定义对象锁定：" + msg);
+        log.debug(String.format("自定义对象%s锁定,返回:%s", objectName, msg));
     }
 
     /**
      * 自定义对象解锁
      *
-     * @param objectName
-     * @param recordId
+     * @param commonHttpClient HTTP Client
+     * @param objectName       自定义对象API名称
+     * @param recordId         自定义对象数据Id
      */
-    public void unlockCustom(String objectName, long recordId) {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+    public void unlockCustomizeObject(CommonHttpClient commonHttpClient, String objectName, long recordId) {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_DELETE);
-        commonData.setCallString(String.format(CUSTOM_ACTIONS_LOCK, objectName, recordId));
+        commonData.setCallString(String.format(COMMON_CUSTOMIZE_ACTIONS_LOCK, objectName, recordId));
 
         String msg = commonHttpClient.performRequest(commonData);
-        log.debug("自定义对象解锁：" + msg);
+        log.debug(String.format("自定义对象%s解锁,返回:%s", objectName, msg));
     }
 
     /**
-     * 订单明细锁定
+     * 转移自定义对象
      *
-     * @param orderProductId
+     * @param commonHttpClient HTTP Client
+     * @param objectName       自定义对象API名称
+     * @param recordId         自定义对象数据Id
      */
-    public void lockOrderProduct(long orderProductId) {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+    public void transfersCustomizeObject(CommonHttpClient commonHttpClient,
+                                         String objectName,
+                                         long recordId,
+                                         long targetUserId) {
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
-        commonData.setCall_type(HTTP_TYPE_PUT);
-        commonData.setCallString(String.format(ORDERPRODUCT_ACTIONS_LOCK, orderProductId));
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
+        commonData.setCall_type(HTTP_TYPE_POST);
+        commonData.setCallString(String.format(COMMON_CUSTOMIZE_ACTIONS_TRANSFERS, objectName, recordId, targetUserId));
 
         String msg = commonHttpClient.performRequest(commonData);
-        log.debug("订单明细锁定：" + msg);
+        log.debug(String.format("自定义对象%s转移,返回:%s", objectName, msg));
     }
 
     /**
-     * 订单明细解锁
+     * 查询对象业务类型
      *
-     * @param orderProductId
+     * @param commonHttpClient HTTP Client
+     * @param apiKey           对象对应的apiKey
+     * @return 返回指定对象的业务类型数组
      */
-    public void unlockOrderProduct(long orderProductId) {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+    public JSONArray getBusiType(CommonHttpClient commonHttpClient, String apiKey) {
+        JSONArray records = new JSONArray();
         CommonData commonData = new CommonData();
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
-        commonData.setCall_type(HTTP_TYPE_DELETE);
-        commonData.setCallString(String.format(ORDERPRODUCT_ACTIONS_LOCK, orderProductId));
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
+        commonData.setCall_type(HTTP_TYPE_GET);
+        commonData.setCallString(String.format(COMMON_BUSITYPE, apiKey));
+        HttpResult httpResult = commonHttpClient.execute(commonData);
+        if (httpResult != null) {
+            String result = httpResult.getResult();
+            JSONObject resultObj = JSONObject.parseObject(result);
+            JSONObject dataObj = resultObj.getJSONObject("data");
+            if (dataObj.getInteger("totalSize") > 0) {
+                return dataObj.getJSONArray("records");
+            } else {
+                log.error("获取业务类型无数据!");
+            }
+        } else {
+            log.error("获取业务类型失败!");
+        }
+        return records;
+    }
 
-        String msg = commonHttpClient.performRequest(commonData);
-        log.debug("订单明细解锁：" + msg);
+    /**
+     * 获取指定通用选项集
+     *
+     * @param commonHttpClient HTTP Client
+     * @param apiKey           通用选项集API名称
+     * @return 返回指定通用选项集数组
+     */
+    public JSONArray getAssignGlobalpicks(CommonHttpClient commonHttpClient, String apiKey) {
+        JSONArray records = new JSONArray();
+        CommonData commonData = new CommonData();
+        String accessToken = constructorImpl(commonHttpClient);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
+        commonData.setCall_type(HTTP_TYPE_GET);
+        commonData.setCallString(String.format(COMMON_GLOBALPICKS_ASSIGN, apiKey));
+        HttpResult httpResult = commonHttpClient.execute(commonData);
+        if (httpResult != null) {
+            String result = httpResult.getResult();
+            JSONObject resultObj = JSONObject.parseObject(result);
+            JSONObject dataObj = resultObj.getJSONObject("data");
+            if (dataObj.getInteger("totalSize") > 0) {
+                records.add(dataObj.getJSONObject("records"));
+                return records;
+            } else {
+                log.error("获取指定通用选项集无数据!");
+            }
+        } else {
+            log.error("获取指定通用选项集失败!");
+        }
+        return records;
+    }
+
+    /**
+     * 获取所有通用选项集
+     *
+     * @param commonHttpClient HTTP Client
+     * @return 返回所有通用选项集数组
+     */
+    public JSONArray getAllGlobalpicks(CommonHttpClient commonHttpClient) {
+        JSONArray records = new JSONArray();
+        CommonData commonData = new CommonData();
+        String accessToken = constructorImpl(commonHttpClient);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
+        commonData.setCall_type(HTTP_TYPE_GET);
+        commonData.setCallString(String.format(COMMON_GLOBALPICKS_ALL));
+        HttpResult httpResult = commonHttpClient.execute(commonData);
+        if (httpResult != null) {
+            String result = httpResult.getResult();
+            JSONObject resultObj = JSONObject.parseObject(result);
+            JSONObject dataObj = resultObj.getJSONObject("data");
+            if (dataObj.getInteger("totalSize") > 0) {
+                records = dataObj.getJSONArray("records");
+                return records;
+            } else {
+                log.error("获取指定通用选项集无数据!");
+            }
+        } else {
+            log.error("获取指定通用选项集失败!");
+        }
+        return records;
+    }
+
+    /**
+     * 根据选项值标签查询选项值编码
+     *
+     * @param globalPickArr 通用选项集数组
+     * @param apiKey        通用选项集API名称
+     * @param optionLabel   选项值标签
+     * @return 返回选项值编码
+     */
+    public Integer getOptionCodeByOptionLabel(JSONArray globalPickArr, String apiKey, String optionLabel) {
+        JSONArray pickOption = new JSONArray();
+        Integer optionCode = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getString("optionLabel").equals(optionLabel)) {
+                optionCode = obj.getInteger("optionCode");
+                break;
+            }
+        }
+        return optionCode;
+    }
+
+    /**
+     * 根据选项值标签模糊查询选项值编码
+     *
+     * @param globalPickArr    通用选项集数组
+     * @param apiKey           通用选项集API名称
+     * @param vagueOptionLabel 选项值标签模糊值
+     * @return 返回选项值编码
+     */
+    public Integer getOptionCodeByVagueOptionLabel(JSONArray globalPickArr, String apiKey, String vagueOptionLabel) {
+        JSONArray pickOption = new JSONArray();
+        Integer optionCode = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getString("optionLabel").contains(vagueOptionLabel)) {
+                optionCode = obj.getInteger("optionCode");
+                break;
+            }
+        }
+        return optionCode;
+    }
+
+    /**
+     * 根据选项值ApiKey查询选项值编码
+     *
+     * @param globalPickArr 通用选项集数组
+     * @param apiKey        通用选项集API名称
+     * @param optionApiKey  选项值ApiKey
+     * @return 返回选项值编码
+     */
+    public Integer getOptionCodeByOptionApiKey(JSONArray globalPickArr, String apiKey, String optionApiKey) {
+        JSONArray pickOption = new JSONArray();
+        Integer optionCode = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getString("optionApiKey").equals(optionApiKey)) {
+                optionCode = obj.getInteger("optionCode");
+                break;
+            }
+        }
+        return optionCode;
+    }
+
+    /**
+     * 根据选项值编码查询选项值ApiKey
+     *
+     * @param globalPickArr 通用选项集数组
+     * @param apiKey        通用选项集API名称
+     * @param optionCode    选项值编码
+     * @return 返回选项值ApiKey
+     */
+    public String getOptionApiKeyByOptionCode(JSONArray globalPickArr, String apiKey, Integer optionCode) {
+        JSONArray pickOption = new JSONArray();
+        String optionApiKey = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getInteger("optionCode").equals(optionCode)) {
+                optionApiKey = obj.getString("optionApiKey");
+                break;
+            }
+        }
+        return optionApiKey;
+    }
+
+    /**
+     * 根据选项值标签查询选项值ApiKey
+     *
+     * @param globalPickArr 通用选项集数组
+     * @param apiKey        通用选项集API名称
+     * @param optionLabel   选项值标签
+     * @return 返回选项值ApiKey
+     */
+    public String getOptionApiKeyByOptionLabel(JSONArray globalPickArr, String apiKey, String optionLabel) {
+        JSONArray pickOption = new JSONArray();
+        String optionApiKey = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getString("optionLabel").equals(optionLabel)) {
+                optionApiKey = obj.getString("optionApiKey");
+                break;
+            }
+        }
+        return optionApiKey;
+    }
+
+    /**
+     * 根据选项值标签模糊查询选项值ApiKey
+     *
+     * @param globalPickArr    通用选项集数组
+     * @param apiKey           通用选项集API名称
+     * @param vagueOptionLabel 选项值标签模糊值
+     * @return 返回选项值ApiKey
+     */
+    public String getOptionApiKeyByVagueOptionLabel(JSONArray globalPickArr, String apiKey, String vagueOptionLabel) {
+        JSONArray pickOption = new JSONArray();
+        String optionApiKey = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getString("optionLabel").contains(vagueOptionLabel)) {
+                optionApiKey = obj.getString("optionApiKey");
+                break;
+            }
+        }
+        return optionApiKey;
+    }
+
+    /**
+     * 根据选项值编码查询选项值标签
+     *
+     * @param globalPickArr 通用选项集数组
+     * @param apiKey        通用选项集API名称
+     * @param optionCode    选项值编码
+     * @return 返回选项值标签
+     */
+    public String getOptionLabelByOptionCode(JSONArray globalPickArr, String apiKey, Integer optionCode) {
+        JSONArray pickOption = new JSONArray();
+        String optionLabel = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getInteger("optionCode").equals(optionCode)) {
+                optionLabel = obj.getString("optionLabel");
+                break;
+            }
+        }
+        return optionLabel;
+    }
+
+    /**
+     * 根据选项值ApiKey查询选项值标签
+     *
+     * @param globalPickArr 通用选项集数组
+     * @param apiKey        通用选项集API名称
+     * @param optionApiKey  选项值ApiKey
+     * @return 返回选项值标签
+     */
+    public String getOptionLabelByOptionApiKey(JSONArray globalPickArr, String apiKey, String optionApiKey) {
+        JSONArray pickOption = new JSONArray();
+        String optionLabel = null;
+        for (int i = 0; i < globalPickArr.size(); i++) {
+            JSONObject obj = globalPickArr.getJSONObject(i);
+            if (obj.getString("apiKey").equals(apiKey)) {
+                pickOption = obj.getJSONArray("pickOption");
+                break;
+            }
+        }
+        for (int i = 0; i < pickOption.size(); i++) {
+            JSONObject obj = pickOption.getJSONObject(i);
+            if (obj.getString("optionApiKey").equals(optionApiKey)) {
+                optionLabel = obj.getString("optionLabel");
+                break;
+            }
+        }
+        return optionLabel;
     }
 
     /**
@@ -1213,7 +1532,7 @@ public class SdkService {
         CommonData commonData = new CommonData();
 
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_POST);
         commonData.setCallString(CREATE_ASYNC_JOB_URI_V2);
 
@@ -1245,7 +1564,7 @@ public class SdkService {
         CommonData commonData = new CommonData();
 
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_PATCH);
         String callString = String.format(CLOSE_ASYNC_JOB_URI_V2, jobId);
         commonData.setCallString(callString);
@@ -1271,7 +1590,7 @@ public class SdkService {
         CommonData commonData = new CommonData();
 
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_POST);
         commonData.setCallString(CREATE_ASYNC_BATCH_URI_V2);
 
@@ -1297,7 +1616,7 @@ public class SdkService {
         CommonData commonData = new CommonData();
 
         String accessToken = constructorImpl(commonHttpClient);
-        commonData.putHeader("Authorization", accessToken);
+        commonData.putHeader(AUTHORIZATION, HEADER_PREFIX + accessToken);
         commonData.setCall_type(HTTP_TYPE_POST);
         commonData.setCallString(CREATE_ASYNC_BATCH_URI_V2);
 
@@ -1344,6 +1663,23 @@ public class SdkService {
     }
 
     /**
+     * 获取长整型数值
+     *
+     * @param value 字符型参数
+     * @return 转换的长整型数值
+     */
+    public long getLong(String value) throws NumberFormatException {
+        long result = 0L;
+
+        if (!value.isEmpty()) {
+            result = Long.valueOf(value);
+
+        }
+
+        return result;
+    }
+
+    /**
      * 获取整型数值
      *
      * @param value 字符型参数
@@ -1358,5 +1694,4 @@ public class SdkService {
 
         return result;
     }
-
 }

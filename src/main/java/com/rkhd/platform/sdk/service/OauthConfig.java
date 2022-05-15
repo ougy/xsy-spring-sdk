@@ -1,4 +1,4 @@
-package com.rkhd.platform.sdk.common;
+package com.rkhd.platform.sdk.service;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

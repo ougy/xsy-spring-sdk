@@ -1,4 +1,4 @@
-package com.rkhd.platform.sdk.common;
+package com.rkhd.platform.sdk.service;
 
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.cache.CacheBuilder;
@@ -10,71 +10,34 @@ import com.rkhd.platform.sdk.http.HttpResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 使用Guava缓存管理token
+ *
  * @author 欧桂源
+ * @date 2022/5/01 12:50
  */
 @Slf4j
 @Component
-@Configuration
 public class TokenCache {
-    @Autowired
     private static OauthConfig oauthConfig;
-
-    @Bean
-    public TaskScheduler taskScheduler() {
-        ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setPoolSize(10);
-        taskScheduler.initialize();
-        return taskScheduler;
-    }
-
-    //每半小时获取一次token
-    @Scheduled(cron = "0 30 * * * ?")
-    public void synchroToken() {
-        CommonHttpClient commonHttpClient = CommonHttpClient.instance();
-        commonHttpClient.setContentEncoding("UTF-8");
-        commonHttpClient.setContentType("application/json");
-
-        String oauthUrl = oauthConfig.getDomain() + "/oauth2/token?grant_type=password" + "&client_id=" + oauthConfig.getClientId()
-                + "&client_secret=" + oauthConfig.getClientSecret() + "&username=" + oauthConfig.getUserName() + "&password=" + oauthConfig.getPassword()
-                + oauthConfig.getSecurityCode();
-        CommonData commonData = new CommonData();
-        commonData.setCall_type("GET");
-        commonData.setCallString(oauthUrl);
-
-        HttpResult result = commonHttpClient.execute(oauthConfig.getReadTimedOutRetry(), commonData);
-        if (result != null && StringUtils.isNotBlank(result.getResult())) {
-            JSONObject jsonObject = JSONObject.parseObject(result.getResult());
-            if (jsonObject.containsKey("access_token")) {
-                String accessToken = jsonObject.getString("access_token");
-                log.debug("TokenCache定时获取token:" + accessToken);
-                TokenCache.setKey("accessToken", accessToken);
-            } else {
-                if (jsonObject.containsKey("error_description")) {
-                    log.error(jsonObject.getString("error_description"));
-                } else {
-                    log.error(jsonObject.toString());
-                }
-            }
-        } else {
-            log.error("can not get the accessToken,please check your config");
-        }
-    }
 
     //声明一个静态的内存块,guava里面的本地缓存
     private static LoadingCache<String, String> localcache;
 
+    @Autowired
+    public TokenCache(OauthConfig oauthConfig) {
+        this.oauthConfig = oauthConfig;
+    }
+
     static {
+        oauthConfig = new OauthConfig();
         localcache =
                 //构建本地缓存，调用链的方式,1是设置缓存的初始化容量，maximumSize是设置缓存最大容量，当超过了最大容量，guava将使用LRU算法（最少使用算法），来移除缓存项
                 //expireAfterAccess(1,TimeUnit.HOURS)设置缓存有效期为1个小时
@@ -103,7 +66,7 @@ public class TokenCache {
                                         JSONObject jsonObject = JSONObject.parseObject(result.getResult());
                                         if (jsonObject.containsKey("access_token")) {
                                             accessToken = jsonObject.getString("access_token");
-                                            log.debug("TokenCache load加载token:" + accessToken);
+                                            log.debug("TokenCache_Load加载token:" + accessToken);
                                             TokenCache.setKey("accessToken", accessToken);
                                         } else {
                                             if (jsonObject.containsKey("error_description")) {
@@ -121,6 +84,43 @@ public class TokenCache {
                                 return accessToken;
                             }
                         });
+
+        //创建任务队列
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.scheduleAtFixedRate(() -> {
+            try {
+                CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+                commonHttpClient.setContentEncoding("UTF-8");
+                commonHttpClient.setContentType("application/json");
+
+                String oauthUrl = oauthConfig.getDomain() + "/oauth2/token?grant_type=password" + "&client_id=" + oauthConfig.getClientId()
+                        + "&client_secret=" + oauthConfig.getClientSecret() + "&username=" + oauthConfig.getUserName() + "&password=" + oauthConfig.getPassword()
+                        + oauthConfig.getSecurityCode();
+                CommonData commonData = new CommonData();
+                commonData.setCall_type("GET");
+                commonData.setCallString(oauthUrl);
+
+                HttpResult result = commonHttpClient.execute(oauthConfig.getReadTimedOutRetry(), commonData);
+                if (result != null && StringUtils.isNotBlank(result.getResult())) {
+                    JSONObject jsonObject = JSONObject.parseObject(result.getResult());
+                    if (jsonObject.containsKey("access_token")) {
+                        String accessToken = jsonObject.getString("access_token");
+                        log.debug("TokenCache定时获取token:" + accessToken);
+                        TokenCache.setKey("accessToken", accessToken);
+                    } else {
+                        if (jsonObject.containsKey("error_description")) {
+                            log.error(jsonObject.getString("error_description"));
+                        } else {
+                            log.error(jsonObject.toString());
+                        }
+                    }
+                } else {
+                    log.error("can not get the accessToken,please check your config");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, 0, 30, TimeUnit.MINUTES);
     }
 
     /**
@@ -149,8 +149,46 @@ public class TokenCache {
             log.debug("从缓存中获取token:" + value);
             return value;
         } catch (ExecutionException e) {
-            log.error("getKey()方法错误", e);
+            log.error("获取本地缓存错误", e);
         }
         return null;
+    }
+
+    /**
+     * 刷新本地缓存
+     */
+    public static void refreshAccessToken() {
+        try {
+            CommonHttpClient commonHttpClient = CommonHttpClient.instance();
+            commonHttpClient.setContentEncoding("UTF-8");
+            commonHttpClient.setContentType("application/json");
+
+            String oauthUrl = oauthConfig.getDomain() + "/oauth2/token?grant_type=password" + "&client_id=" + oauthConfig.getClientId()
+                    + "&client_secret=" + oauthConfig.getClientSecret() + "&username=" + oauthConfig.getUserName() + "&password=" + oauthConfig.getPassword()
+                    + oauthConfig.getSecurityCode();
+            CommonData commonData = new CommonData();
+            commonData.setCall_type("GET");
+            commonData.setCallString(oauthUrl);
+
+            HttpResult result = commonHttpClient.execute(oauthConfig.getReadTimedOutRetry(), commonData);
+            if (result != null && StringUtils.isNotBlank(result.getResult())) {
+                JSONObject jsonObject = JSONObject.parseObject(result.getResult());
+                if (jsonObject.containsKey("access_token")) {
+                    String accessToken = jsonObject.getString("access_token");
+                    log.debug("refreshAccessToken加载token:" + accessToken);
+                    TokenCache.setKey("accessToken", accessToken);
+                } else {
+                    if (jsonObject.containsKey("error_description")) {
+                        log.error(jsonObject.getString("error_description"));
+                    } else {
+                        log.error(jsonObject.toString());
+                    }
+                }
+            } else {
+                log.error("can not get the accessToken,please check your config");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

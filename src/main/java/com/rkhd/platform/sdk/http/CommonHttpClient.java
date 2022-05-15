@@ -3,6 +3,8 @@ package com.rkhd.platform.sdk.http;
 import com.alibaba.fastjson.JSONObject;
 import com.rkhd.platform.sdk.exception.XsyHttpException;
 import com.rkhd.platform.sdk.http.handler.ResponseBodyHandler;
+import com.rkhd.platform.sdk.service.TokenCache;
+import com.rkhd.platform.sdk.util.IOUtil;
 import com.rkhd.platform.sdk.util.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.Header;
@@ -27,6 +29,7 @@ import org.apache.http.util.EntityUtils;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
@@ -189,13 +192,14 @@ public class CommonHttpClient {
                 return httpResponse;
             } catch (Exception e) {
                 StringBuilder sb = new StringBuilder();
-                sb.append("request: [").append(data.toString()).append("]")
-                        .append(", response: ").append(e.getMessage());
+                sb.append("request: [").append(data.toString()).append("]").append(", response: ").append(e.getMessage());
                 //GET请求超时立即重试一次
                 if (e.getMessage().equals("Read timed out") && (Optional.of(data).get()).getCall_type().toUpperCase().equals("GET")) {
                     sb.append(",超时重试...");
-                    TimeUnit.MILLISECONDS.sleep(1L);
-                    HttpResponse httpResponse = executeRequest(data);
+                    log.error("executeBefore超时重试," + sb.toString());
+                    TimeUnit.MILLISECONDS.sleep(500L);
+                    HttpResponse httpResponse = executeBefore(data);
+
                     return httpResponse;
                 }
 
@@ -219,24 +223,35 @@ public class CommonHttpClient {
 
     private HttpResponse executeAfter(long contentLength, String result, CommonData data) {
         HttpResponse httpResponse = null;
-        //增加errorMsgLength判断，为了避免某文本域中包括【用户访问频率超出限制】此内容
-        //"msg":"用户访问频率超出限制"
-        if (contentLength < errorMsgLength && result.contains("\"msg\":\"用户访问频率超出限制\"")) {
+        //增加errorMsgLength判断，为了避免某文本域中包括【用户访问频率超出限制】或【无效的access token】此内容
+        if (contentLength < errorMsgLength) {
             JSONObject obj = JSONObject.parseObject(result);
+            StringBuilder sb = new StringBuilder();
+            sb.append("request: [").append(data.toString()).append("]").append(", response: ").append(result);
+            //{"msg":"无效的access token","ext":[],"result":{},"code":1020008}
+            if ("1020008".equals(obj.getString("code"))) {
+                sb.append(",无效的access token重试...");
+                log.error("executeAfter判断无效的access token," + sb.toString());
+                try {
+                    TimeUnit.MILLISECONDS.sleep(500L);
+                    RateLimiter.acquire();
+                    TokenCache.refreshAccessToken();
+                    httpResponse = executeBefore(data);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            //{"msg":"用户访问频率超出限制","ext":[],"result":{},"code":1020025}
             if ("1020025".equals(obj.getString("code")) || "1020024".equals(obj.getString("code"))) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("request: [").append(data.toString()).append("]")
-                        .append(", response: ").append(result)
-                        .append(",访问超频率重试...");
+                sb.append(",访问超频率重试...");
                 log.error("executeAfter判断超频重试," + sb.toString());
                 try {
-                    TimeUnit.MILLISECONDS.sleep(1L);
+                    TimeUnit.MILLISECONDS.sleep(500L);
                     RateLimiter.acquire();
                     httpResponse = executeBefore(data);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                return httpResponse;
             }
         }
         return httpResponse;
@@ -270,6 +285,23 @@ public class CommonHttpClient {
                 response.setData((T) handler.handle(data));
             }
             return response;
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw new XsyHttpException(e.getMessage(), Long.valueOf(100000L), e);
+        }
+    }
+
+    public RkhdFile downFile(CommonData data) throws XsyHttpException {
+        try {
+            HttpResponse httpResponse = executeRequest(data);
+            InputStream is = httpResponse.getEntity().getContent();
+            String fileContent = IOUtil.toStringWithLimit(is);
+            Header fileNameHeader = httpResponse.getFirstHeader("Content-Disposition");
+            String fileName = null;
+            if (fileNameHeader != null && fileNameHeader.getValue() != null) {
+                fileName = fileNameHeader.getValue().replaceFirst("(?i)^.*filename=\"?([^\"]+)\"?.*$", "$1");
+            }
+            return new RkhdFile(fileName, fileContent);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new XsyHttpException(e.getMessage(), Long.valueOf(100000L), e);
